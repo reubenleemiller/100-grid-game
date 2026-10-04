@@ -40,6 +40,10 @@ export default function Home() {
   const [drawnNumber, setDrawnNumber] = useState<number | null>(null);
   const [timerPosition, setTimerPosition] = useState({ x: 0, y: 0 });
   const [drawPosition, setDrawPosition] = useState({ x: 0, y: 0 });
+  const [timerWidth, setTimerWidth] = useState(232);
+  const [drawWidth, setDrawWidth] = useState(176);
+  const [gridSize, setGridSize] = useState<number | null>(null);
+  const [gridTextScale, setGridTextScale] = useState(100);
   const drag = useRef<{ kind: "timer" | "draw"; x: number; y: number; startX: number; startY: number } | null>(null);
 
   const remainingSquares = 100 - Object.keys(claims).length;
@@ -60,6 +64,28 @@ export default function Home() {
     const interval = window.setInterval(() => setSeconds((time) => time + 1), 1000);
     return () => window.clearInterval(interval);
   }, [running, mode, seconds, duration]);
+
+  useEffect(() => {
+    if (!smartboard) {
+      setGridSize(null);
+      return;
+    }
+
+    const fitGridToViewport = () => {
+      const compact = window.innerWidth <= 760;
+      const sideSpace = compact ? 28 : teamsHidden ? 100 : 380;
+      const topSpace = headerHidden ? 91 : 155;
+      setGridSize(Math.max(260, Math.floor(Math.min(window.innerHeight - topSpace, window.innerWidth - sideSpace))));
+    };
+
+    fitGridToViewport();
+    window.addEventListener("resize", fitGridToViewport);
+    document.addEventListener("fullscreenchange", fitGridToViewport);
+    return () => {
+      window.removeEventListener("resize", fitGridToViewport);
+      document.removeEventListener("fullscreenchange", fitGridToViewport);
+    };
+  }, [smartboard, headerHidden, teamsHidden]);
 
   function openClaim(square: number) {
     setSelectedSquare(square);
@@ -175,6 +201,11 @@ export default function Home() {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
+  function resizePopout(kind: "timer" | "draw", amount: number) {
+    if (kind === "timer") setTimerWidth((width) => Math.min(380, Math.max(190, width + amount)));
+    else setDrawWidth((width) => Math.min(310, Math.max(154, width + amount)));
+  }
+
   function submitDuration(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     resetTimer();
@@ -183,7 +214,7 @@ export default function Home() {
   return (
     <main className={` ${smartboard ? "smartboard" : ""}${headerHidden ? " header-hidden" : ""}${teamsHidden ? " teams-hidden" : ""}`}>
       <header className="topbar">
-        <div className="brand"><span className="brand-mark">100</span><span>Hundred Squares</span><i className="site-spinner brand-spinner" aria-hidden /></div>
+        <div className="brand"><span className="brand-mark">100</span><span>Hundred Squares</span></div>
         <div className="top-actions">
           <button className="view-button" onClick={toggleSmartboardMode} aria-pressed={smartboard}>{smartboard ? "Exit smartboard" : "Smartboard view"} <span aria-hidden>▣</span></button>
           <button className="text-button" onClick={() => setSettingsOpen(true)}>Game settings <span aria-hidden>↗</span></button>
@@ -197,7 +228,7 @@ export default function Home() {
           <p className="subtitle">Choose a team, tap an open square, and watch your class build the board together.</p>
         </div>
         <aside className="timer-card" aria-label="Game timer">
-          <div className="timer-head"><span className="pulse" /><i className="site-spinner" aria-hidden /> GAME TIMER <button onClick={resetTimer} aria-label="Reset timer">↻</button></div>
+          <div className="timer-head"><span className="pulse" /> GAME TIMER <button onClick={resetTimer} aria-label="Reset timer">↻</button></div>
           <div className="timer-value">{formatTime(displaySeconds)}</div>
           <div className="timer-controls">
             <button className="icon-button" onClick={resetTimer} aria-label="Reset timer">↺</button>
@@ -211,7 +242,7 @@ export default function Home() {
 
       <section className="game-layout">
         <aside className="team-panel">
-          <div className="section-heading"><div><p className="eyebrow">PLAYERS <i className="site-spinner" aria-hidden /></p><h2>Teams</h2></div><span>{teams.length} / 12</span></div>
+          <div className="section-heading"><div><p className="eyebrow">PLAYERS</p><h2>Teams</h2></div><span>{teams.length} / 12</span></div>
           <div className="team-list">
             {teams.map((team) => {
               const score = Object.values(claims).filter((id) => id === team.id).length;
@@ -223,8 +254,8 @@ export default function Home() {
         </aside>
 
         <section className="board-area">
-          <div className="board-header"><div><p className="eyebrow">{smartboard ? "SMARTBOARD MODE" : "THE BOARD"} <i className="site-spinner" aria-hidden /></p><h2>100 squares <span>· {remainingSquares} open</span></h2></div><div className="board-actions">{smartboard && <button className="fullscreen-button" onClick={toggleFullscreen}>⛶ Full screen</button>}<p>Tap an open square to assign it</p>{!smartboard && <button className="draw-button" onClick={() => { setRunning(false); setFinishOpen(true); }}>Finish &amp; draw <span>✦</span></button>}</div></div>
-          <div className="grid" aria-label="100 square game board">
+          <div className="board-header"><div><p className="eyebrow">{smartboard ? "SMARTBOARD MODE" : "THE BOARD"}</p><h2>100 squares <span>· {remainingSquares} open</span></h2></div><div className="board-actions">{smartboard && <button className="fullscreen-button" onClick={toggleFullscreen}>⛶ Full screen</button>}<p>Tap an open square to assign it</p>{!smartboard && <button className="draw-button" onClick={() => { setRunning(false); setFinishOpen(true); }}>Finish &amp; draw <span>✦</span></button>}</div></div>
+          <div className="grid" style={{ ...(smartboard && gridSize ? { width: gridSize } : {}), "--grid-text-scale": gridTextScale / 100 } as React.CSSProperties} aria-label="100 square game board">
             {Array.from({ length: 100 }, (_, index) => {
               const square = index + 1;
               const team = teams.find((item) => item.id === claims[square]);
@@ -237,18 +268,18 @@ export default function Home() {
       </section>
 
       {smartboard && <>
-        <aside className="draggable-popout timer-popout" style={{ left: timerPosition.x, top: timerPosition.y }}>
-          <button className="drag-handle" onPointerDown={(event) => beginDrag("timer", event)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} aria-label="Drag timer panel"><span>⠿</span> Move timer</button>
+        <aside className="draggable-popout timer-popout" style={{ left: timerPosition.x, top: timerPosition.y, width: timerWidth }}>
+          <div className="popout-bar"><button className="drag-handle" onPointerDown={(event) => beginDrag("timer", event)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} aria-label="Drag timer panel"><span>⠿</span> Move timer</button><span className="popout-size-controls"><button onClick={() => resizePopout("timer", -20)} aria-label="Make timer smaller">−</button><button onClick={() => resizePopout("timer", 20)} aria-label="Make timer larger">+</button></span></div>
           <div className="timer-card" aria-label="Game timer">
-            <div className="timer-head"><span className="pulse" /><i className="site-spinner" aria-hidden /> GAME TIMER <button onClick={resetTimer} aria-label="Reset timer">↻</button></div>
+            <div className="timer-head"><span className="pulse" /> GAME TIMER <button onClick={resetTimer} aria-label="Reset timer">↻</button></div>
             <div className="timer-value">{formatTime(displaySeconds)}</div>
             <div className="timer-controls"><button className="icon-button" onClick={resetTimer} aria-label="Reset timer">↺</button><button className="play-button" onClick={() => setRunning((value) => !value)}>{running ? "Ⅱ  Pause" : "▶  Start"}</button></div>
             <button className="timer-type" onClick={() => { setMode(mode === "up" ? "down" : "up"); resetTimer(); }}>{mode === "up" ? "Counting up" : `Countdown · ${formatTime(duration)}`} <span>⌄</span></button>
           </div>
         </aside>
-        <aside className="draggable-popout draw-popout" style={{ left: drawPosition.x, top: drawPosition.y }}>
-          <button className="drag-handle" onPointerDown={(event) => beginDrag("draw", event)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} aria-label="Drag random draw control"><span>⠿</span> Move draw</button>
-          <div><p>LUCKY SQUARE <i className="site-spinner" aria-hidden /></p><button onClick={() => { setRunning(false); setFinishOpen(true); }}>Finish &amp; draw <span>✦</span></button><div className="view-toggles"><button onClick={() => setHeaderHidden((value) => !value)} aria-pressed={headerHidden}>{headerHidden ? "Show header" : "Hide header"}</button><button onClick={() => setTeamsHidden((value) => !value)} aria-pressed={teamsHidden}>{teamsHidden ? "Show teams" : "Hide teams"}</button></div></div>
+        <aside className="draggable-popout draw-popout" style={{ left: drawPosition.x, top: drawPosition.y, width: drawWidth }}>
+          <div className="popout-bar"><button className="drag-handle" onPointerDown={(event) => beginDrag("draw", event)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} aria-label="Drag random draw control"><span>⠿</span> Move draw</button><span className="popout-size-controls"><button onClick={() => resizePopout("draw", -16)} aria-label="Make draw control smaller">−</button><button onClick={() => resizePopout("draw", 16)} aria-label="Make draw control larger">+</button></span></div>
+          <div><p>LUCKY SQUARE</p><button onClick={() => { setRunning(false); setFinishOpen(true); }}>Finish &amp; draw <span>✦</span></button><div className="view-toggles"><button onClick={() => setHeaderHidden((value) => !value)} aria-pressed={headerHidden}>{headerHidden ? "Show header" : "Hide header"}</button><button onClick={() => setTeamsHidden((value) => !value)} aria-pressed={teamsHidden}>{teamsHidden ? "Show teams" : "Hide teams"}</button></div></div>
         </aside>
       </>}
 
@@ -267,6 +298,7 @@ export default function Home() {
           <p className="eyebrow">CUSTOMISE YOUR GAME</p><h2 id="settings-title">Game settings</h2>
           <div className="settings-block"><div className="settings-label"><span>Teams</span><small>Up to 12 teams</small></div>{teams.map((team) => <div className="team-editor" key={team.id}><input type="color" value={team.colour} onChange={(e) => updateTeam(team.id, "colour", e.target.value)} aria-label={`${team.name} colour`} /><input value={team.name} maxLength={14} onChange={(e) => updateTeam(team.id, "name", e.target.value)} aria-label="Team name" /><button onClick={() => removeTeam(team.id)} disabled={teams.length === 1} aria-label={`Remove ${team.name}`}>×</button></div>)}<button className="add-team" onClick={addTeam} disabled={teams.length === 12}>+ Add a team</button></div>
           <form className="settings-block timer-settings" onSubmit={submitDuration}><div className="settings-label"><span>Timer</span><small>Choose your pacing</small></div><div className="mode-buttons"><button type="button" className={mode === "up" ? "active" : ""} onClick={() => { setMode("up"); resetTimer(); }}>Count up</button><button type="button" className={mode === "down" ? "active" : ""} onClick={() => { setMode("down"); resetTimer(); }}>Count down</button></div>{mode === "down" && <label className="duration">Duration (minutes)<input type="number" min="1" max="180" value={Math.ceil(duration / 60)} onChange={(event) => setDuration(Math.max(60, Number(event.target.value) * 60 || 60))} /></label>}<button className="save-settings" type="submit">Save timer settings</button></form>
+          <div className="settings-block grid-text-settings"><div className="settings-label"><span>Grid text size</span><small>{gridTextScale}%</small></div><p>Adjust the number and team text inside every square.</p><div className="text-size-control"><span>A</span><input type="range" min="80" max="150" step="5" value={gridTextScale} onChange={(event) => setGridTextScale(Number(event.target.value))} aria-label="Grid text size" /><strong>A</strong></div></div>
         </section>
       </div>}
 
