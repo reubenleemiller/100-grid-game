@@ -40,8 +40,6 @@ export default function Home() {
   const [drawnNumber, setDrawnNumber] = useState<number | null>(null);
   const [timerPosition, setTimerPosition] = useState({ x: 0, y: 0 });
   const [drawPosition, setDrawPosition] = useState({ x: 0, y: 0 });
-  const [timerWidth, setTimerWidth] = useState(232);
-  const [drawWidth, setDrawWidth] = useState(176);
   const [gridSize, setGridSize] = useState<number | null>(null);
   const [gridTextScale, setGridTextScale] = useState(100);
   const drag = useRef<{ kind: "timer" | "draw"; x: number; y: number; startX: number; startY: number } | null>(null);
@@ -201,14 +199,10 @@ export default function Home() {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
-  function resizePopout(kind: "timer" | "draw", amount: number) {
-    if (kind === "timer") setTimerWidth((width) => Math.min(380, Math.max(190, width + amount)));
-    else setDrawWidth((width) => Math.min(310, Math.max(154, width + amount)));
-  }
-
   function submitDuration(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     resetTimer();
+    setSettingsOpen(false);
   }
 
   return (
@@ -268,8 +262,8 @@ export default function Home() {
       </section>
 
       {smartboard && <>
-        <aside className="draggable-popout timer-popout" style={{ left: timerPosition.x, top: timerPosition.y, width: timerWidth }}>
-          <div className="popout-bar"><button className="drag-handle" onPointerDown={(event) => beginDrag("timer", event)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} aria-label="Drag timer panel"><span>⠿</span> Move timer</button><span className="popout-size-controls"><button onClick={() => resizePopout("timer", -20)} aria-label="Make timer smaller">−</button><button onClick={() => resizePopout("timer", 20)} aria-label="Make timer larger">+</button></span></div>
+        <aside className="draggable-popout timer-popout" style={{ left: timerPosition.x, top: timerPosition.y }}>
+          <div className="popout-bar"><button className="drag-handle" onPointerDown={(event) => beginDrag("timer", event)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} aria-label="Drag timer panel"><span>⠿</span> Move timer</button></div>
           <div className="timer-card" aria-label="Game timer">
             <div className="timer-head"><span className="pulse" /> GAME TIMER <button onClick={resetTimer} aria-label="Reset timer">↻</button></div>
             <div className="timer-value">{formatTime(displaySeconds)}</div>
@@ -277,8 +271,8 @@ export default function Home() {
             <button className="timer-type" onClick={() => { setMode(mode === "up" ? "down" : "up"); resetTimer(); }}>{mode === "up" ? "Counting up" : `Countdown · ${formatTime(duration)}`} <span>⌄</span></button>
           </div>
         </aside>
-        <aside className="draggable-popout draw-popout" style={{ left: drawPosition.x, top: drawPosition.y, width: drawWidth }}>
-          <div className="popout-bar"><button className="drag-handle" onPointerDown={(event) => beginDrag("draw", event)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} aria-label="Drag random draw control"><span>⠿</span> Move draw</button><span className="popout-size-controls"><button onClick={() => resizePopout("draw", -16)} aria-label="Make draw control smaller">−</button><button onClick={() => resizePopout("draw", 16)} aria-label="Make draw control larger">+</button></span></div>
+        <aside className="draggable-popout draw-popout" style={{ left: drawPosition.x, top: drawPosition.y }}>
+          <div className="popout-bar"><button className="drag-handle" onPointerDown={(event) => beginDrag("draw", event)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} aria-label="Drag random draw control"><span>⠿</span> Move draw</button></div>
           <div><p>LUCKY SQUARE</p><button onClick={() => { setRunning(false); setFinishOpen(true); }}>Finish &amp; draw <span>✦</span></button><div className="view-toggles"><button onClick={() => setHeaderHidden((value) => !value)} aria-pressed={headerHidden}>{headerHidden ? "Show header" : "Hide header"}</button><button onClick={() => setTeamsHidden((value) => !value)} aria-pressed={teamsHidden}>{teamsHidden ? "Show teams" : "Hide teams"}</button></div></div>
         </aside>
       </>}
