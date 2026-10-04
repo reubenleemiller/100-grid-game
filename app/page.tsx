@@ -25,6 +25,8 @@ export default function Home() {
   const [claims, setClaims] = useState<Record<number, number>>({});
   const [selectedSquare, setSelectedSquare] = useState<number | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<number | null>(1);
+  const [tileAction, setTileAction] = useState<"assign" | "reset">("assign");
+  const [isUpdatingTile, setIsUpdatingTile] = useState(false);
   const [mode, setMode] = useState<TimerMode>("up");
   const [duration, setDuration] = useState(300);
   const [seconds, setSeconds] = useState(0);
@@ -60,15 +62,38 @@ export default function Home() {
   }, [running, mode, seconds, duration]);
 
   function openClaim(square: number) {
-    if (claims[square]) return;
     setSelectedSquare(square);
-    setSelectedTeam(teams[0]?.id ?? null);
+    if (claims[square]) {
+      setTileAction("reset");
+      setSelectedTeam(claims[square]);
+    } else {
+      setTileAction("assign");
+      setSelectedTeam(teams[0]?.id ?? null);
+    }
   }
 
   function confirmClaim() {
     if (selectedSquare === null || selectedTeam === null) return;
-    setClaims((current) => ({ ...current, [selectedSquare]: selectedTeam }));
-    setSelectedSquare(null);
+    setIsUpdatingTile(true);
+    window.setTimeout(() => {
+      setClaims((current) => ({ ...current, [selectedSquare]: selectedTeam }));
+      setIsUpdatingTile(false);
+      setSelectedSquare(null);
+    }, 280);
+  }
+
+  function resetClaim() {
+    if (selectedSquare === null) return;
+    setIsUpdatingTile(true);
+    window.setTimeout(() => {
+      setClaims((current) => {
+        const next = { ...current };
+        delete next[selectedSquare];
+        return next;
+      });
+      setIsUpdatingTile(false);
+      setSelectedSquare(null);
+    }, 280);
   }
 
   function resetTimer() {
@@ -158,7 +183,7 @@ export default function Home() {
   return (
     <main className={` ${smartboard ? "smartboard" : ""}${headerHidden ? " header-hidden" : ""}${teamsHidden ? " teams-hidden" : ""}`}>
       <header className="topbar">
-        <div className="brand"><span className="brand-mark">100</span><span>Hundred Squares</span></div>
+        <div className="brand"><span className="brand-mark">100</span><span>Hundred Squares</span><i className="site-spinner brand-spinner" aria-hidden /></div>
         <div className="top-actions">
           <button className="view-button" onClick={toggleSmartboardMode} aria-pressed={smartboard}>{smartboard ? "Exit smartboard" : "Smartboard view"} <span aria-hidden>▣</span></button>
           <button className="text-button" onClick={() => setSettingsOpen(true)}>Game settings <span aria-hidden>↗</span></button>
@@ -172,7 +197,7 @@ export default function Home() {
           <p className="subtitle">Choose a team, tap an open square, and watch your class build the board together.</p>
         </div>
         <aside className="timer-card" aria-label="Game timer">
-          <div className="timer-head"><span className="pulse" /> GAME TIMER <button onClick={resetTimer} aria-label="Reset timer">↻</button></div>
+          <div className="timer-head"><span className="pulse" /><i className="site-spinner" aria-hidden /> GAME TIMER <button onClick={resetTimer} aria-label="Reset timer">↻</button></div>
           <div className="timer-value">{formatTime(displaySeconds)}</div>
           <div className="timer-controls">
             <button className="icon-button" onClick={resetTimer} aria-label="Reset timer">↺</button>
@@ -186,7 +211,7 @@ export default function Home() {
 
       <section className="game-layout">
         <aside className="team-panel">
-          <div className="section-heading"><div><p className="eyebrow">PLAYERS</p><h2>Teams</h2></div><span>{teams.length} / 12</span></div>
+          <div className="section-heading"><div><p className="eyebrow">PLAYERS <i className="site-spinner" aria-hidden /></p><h2>Teams</h2></div><span>{teams.length} / 12</span></div>
           <div className="team-list">
             {teams.map((team) => {
               const score = Object.values(claims).filter((id) => id === team.id).length;
@@ -198,7 +223,7 @@ export default function Home() {
         </aside>
 
         <section className="board-area">
-          <div className="board-header"><div><p className="eyebrow">{smartboard ? "SMARTBOARD MODE" : "THE BOARD"}</p><h2>100 squares <span>· {remainingSquares} open</span></h2></div><div className="board-actions">{smartboard && <button className="fullscreen-button" onClick={toggleFullscreen}>⛶ Full screen</button>}<p>Tap an open square to assign it</p>{!smartboard && <button className="draw-button" onClick={() => { setRunning(false); setFinishOpen(true); }}>Finish &amp; draw <span>✦</span></button>}</div></div>
+          <div className="board-header"><div><p className="eyebrow">{smartboard ? "SMARTBOARD MODE" : "THE BOARD"} <i className="site-spinner" aria-hidden /></p><h2>100 squares <span>· {remainingSquares} open</span></h2></div><div className="board-actions">{smartboard && <button className="fullscreen-button" onClick={toggleFullscreen}>⛶ Full screen</button>}<p>Tap an open square to assign it</p>{!smartboard && <button className="draw-button" onClick={() => { setRunning(false); setFinishOpen(true); }}>Finish &amp; draw <span>✦</span></button>}</div></div>
           <div className="grid" aria-label="100 square game board">
             {Array.from({ length: 100 }, (_, index) => {
               const square = index + 1;
@@ -215,7 +240,7 @@ export default function Home() {
         <aside className="draggable-popout timer-popout" style={{ left: timerPosition.x, top: timerPosition.y }}>
           <button className="drag-handle" onPointerDown={(event) => beginDrag("timer", event)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} aria-label="Drag timer panel"><span>⠿</span> Move timer</button>
           <div className="timer-card" aria-label="Game timer">
-            <div className="timer-head"><span className="pulse" /> GAME TIMER <button onClick={resetTimer} aria-label="Reset timer">↻</button></div>
+            <div className="timer-head"><span className="pulse" /><i className="site-spinner" aria-hidden /> GAME TIMER <button onClick={resetTimer} aria-label="Reset timer">↻</button></div>
             <div className="timer-value">{formatTime(displaySeconds)}</div>
             <div className="timer-controls"><button className="icon-button" onClick={resetTimer} aria-label="Reset timer">↺</button><button className="play-button" onClick={() => setRunning((value) => !value)}>{running ? "Ⅱ  Pause" : "▶  Start"}</button></div>
             <button className="timer-type" onClick={() => { setMode(mode === "up" ? "down" : "up"); resetTimer(); }}>{mode === "up" ? "Counting up" : `Countdown · ${formatTime(duration)}`} <span>⌄</span></button>
@@ -223,19 +248,16 @@ export default function Home() {
         </aside>
         <aside className="draggable-popout draw-popout" style={{ left: drawPosition.x, top: drawPosition.y }}>
           <button className="drag-handle" onPointerDown={(event) => beginDrag("draw", event)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} aria-label="Drag random draw control"><span>⠿</span> Move draw</button>
-          <div><p>LUCKY SQUARE</p><button onClick={() => { setRunning(false); setFinishOpen(true); }}>Finish &amp; draw <span>✦</span></button><div className="view-toggles"><button onClick={() => setHeaderHidden((value) => !value)} aria-pressed={headerHidden}>{headerHidden ? "Show header" : "Hide header"}</button><button onClick={() => setTeamsHidden((value) => !value)} aria-pressed={teamsHidden}>{teamsHidden ? "Show teams" : "Hide teams"}</button></div></div>
+          <div><p>LUCKY SQUARE <i className="site-spinner" aria-hidden /></p><button onClick={() => { setRunning(false); setFinishOpen(true); }}>Finish &amp; draw <span>✦</span></button><div className="view-toggles"><button onClick={() => setHeaderHidden((value) => !value)} aria-pressed={headerHidden}>{headerHidden ? "Show header" : "Hide header"}</button><button onClick={() => setTeamsHidden((value) => !value)} aria-pressed={teamsHidden}>{teamsHidden ? "Show teams" : "Hide teams"}</button></div></div>
         </aside>
       </>}
 
-      {selectedSquare !== null && <div className="modal-backdrop" role="presentation" onMouseDown={() => setSelectedSquare(null)}>
+      {selectedSquare !== null && <div className="modal-backdrop" role="presentation" onMouseDown={() => !isUpdatingTile && setSelectedSquare(null)}>
         <section className="claim-modal" role="dialog" aria-modal="true" aria-labelledby="claim-title" onMouseDown={(event) => event.stopPropagation()}>
-          <button className="close" onClick={() => setSelectedSquare(null)} aria-label="Close">×</button>
-          <p className="eyebrow">SQUARE {selectedSquare}</p><h2 id="claim-title">Who claimed this square?</h2>
-          <p>Choose a team, then confirm their colourful claim.</p>
-          <div className="team-picker">
-            {teams.map((team) => <button key={team.id} onClick={() => setSelectedTeam(team.id)} className={selectedTeam === team.id ? "selected" : ""} style={{ "--team-colour": team.colour } as React.CSSProperties}><span style={{ background: team.colour }} />{team.name}<b>{selectedTeam === team.id ? "✓" : ""}</b></button>)}
-          </div>
-          <div className="modal-actions"><button className="cancel" onClick={() => setSelectedSquare(null)}>Cancel</button><button className="confirm" onClick={confirmClaim} disabled={selectedTeam === null}>Confirm claim <span>→</span></button></div>
+          <button className="close" onClick={() => setSelectedSquare(null)} disabled={isUpdatingTile} aria-label="Close">×</button>
+          <p className="eyebrow">SQUARE {selectedSquare}</p><h2 id="claim-title">{tileAction === "reset" ? "Reset this tile?" : "Who claimed this square?"}</h2>
+          {tileAction === "reset" ? <p><b>{teams.find((team) => team.id === selectedTeam)?.name ?? "A team"}</b> currently owns this square. Resetting makes it available again.</p> : <><p>Choose a team, then confirm their colourful claim.</p><div className="team-picker">{teams.map((team) => <button key={team.id} onClick={() => setSelectedTeam(team.id)} className={selectedTeam === team.id ? "selected" : ""} style={{ "--team-colour": team.colour } as React.CSSProperties}><span style={{ background: team.colour }} />{team.name}<b>{selectedTeam === team.id ? "✓" : ""}</b></button>)}</div></>}
+          <div className="modal-actions"><button className="cancel" onClick={() => setSelectedSquare(null)} disabled={isUpdatingTile}>{tileAction === "reset" ? "Keep tile" : "Cancel"}</button>{tileAction === "reset" ? <button className="reset-tile" onClick={resetClaim} disabled={isUpdatingTile}>{isUpdatingTile ? <><i className="button-spinner" />Resetting…</> : <>Reset tile <span>↺</span></>}</button> : <button className="confirm" onClick={confirmClaim} disabled={selectedTeam === null || isUpdatingTile}>{isUpdatingTile ? <><i className="button-spinner" />Claiming…</> : <>Confirm claim <span>→</span></>}</button>}</div>
         </section>
       </div>}
 
