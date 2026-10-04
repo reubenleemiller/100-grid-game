@@ -47,7 +47,9 @@ export default function Home() {
   const [drawPosition, setDrawPosition] = useState({ x: 0, y: 0 });
   const [gridSize, setGridSize] = useState<number | null>(null);
   const [gridTextScale, setGridTextScale] = useState(100);
+  const [hiddenSquareNumbers, setHiddenSquareNumbers] = useState<Record<number, true>>({});
   const drag = useRef<{ kind: "timer" | "draw"; x: number; y: number; startX: number; startY: number } | null>(null);
+  const squareRefs = useRef<Record<number, HTMLButtonElement | null>>({});
 
   const remainingSquares = 100 - Object.keys(claims).length;
   const displaySeconds = mode === "down" ? duration - seconds : seconds;
@@ -90,6 +92,46 @@ export default function Home() {
       document.removeEventListener("fullscreenchange", fitGridToViewport);
     };
   }, [smartboard, headerHidden, teamsHidden]);
+
+  useEffect(() => {
+    const overlaps = (first: DOMRect, second: DOMRect) => (
+      first.left < second.right
+      && first.right > second.left
+      && first.top < second.bottom
+      && first.bottom > second.top
+    );
+
+    const updateHiddenSquareNumbers = () => {
+      const hideOnMobile = window.matchMedia("(max-width: 760px)").matches;
+      const nextHidden: Record<number, true> = {};
+      for (const square of Object.keys(claims).map(Number)) {
+        if (hideOnMobile) {
+          nextHidden[square] = true;
+          continue;
+        }
+        const squareElement = squareRefs.current[square];
+        if (!squareElement) continue;
+        const numberElement = squareElement.querySelector("span");
+        const teamElement = squareElement.querySelector("em");
+        if (!numberElement || !teamElement) continue;
+        if (overlaps(numberElement.getBoundingClientRect(), teamElement.getBoundingClientRect())) {
+          nextHidden[square] = true;
+        }
+      }
+      setHiddenSquareNumbers((current) => {
+        const currentKeys = Object.keys(current);
+        const nextKeys = Object.keys(nextHidden);
+        if (currentKeys.length === nextKeys.length && currentKeys.every((key) => nextHidden[Number(key)])) {
+          return current;
+        }
+        return nextHidden;
+      });
+    };
+
+    updateHiddenSquareNumbers();
+    window.addEventListener("resize", updateHiddenSquareNumbers);
+    return () => window.removeEventListener("resize", updateHiddenSquareNumbers);
+  }, [claims, teams, gridTextScale, smartboard, gridSize]);
 
   function openClaim(square: number) {
     setSelectedSquare(square);
@@ -270,7 +312,7 @@ export default function Home() {
             {Array.from({ length: 100 }, (_, index) => {
               const square = index + 1;
               const team = teams.find((item) => item.id === claims[square]);
-              return <button key={square} onClick={() => openClaim(square)} className={`square ${team ? "claimed" : ""}`} style={team ? { background: team.colour } : undefined} aria-label={team ? `Square ${square}, ${team.name}` : `Claim square ${square}`}>
+              return <button key={square} ref={(element) => { squareRefs.current[square] = element; }} onClick={() => openClaim(square)} className={`square ${team ? "claimed" : ""}${team && hiddenSquareNumbers[square] ? " hide-number" : ""}`} style={team ? { background: team.colour } : undefined} aria-label={team ? `Square ${square}, ${team.name}` : `Claim square ${square}`}>
                 <span>{square}</span>{team && <em>{team.name.replace("Team ", "T")}</em>}
               </button>;
             })}
